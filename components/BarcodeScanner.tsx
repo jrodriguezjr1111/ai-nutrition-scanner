@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, Alert } from 'react-native';
-import { Camera, useCameraDevices, useFrameProcessor } from 'react-native-vision-camera';
-import { runOnJS } from 'react-native-reanimated';
+import { BarCodeScanner } from 'expo-barcode-scanner';
+import { Camera } from 'expo-camera';
 
 interface BarcodeScannerProps {
   onBarcodeScanned: (barcode: string) => void;
@@ -12,72 +12,49 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
   onBarcodeScanned,
   isActive,
 }) => {
-  const [hasPermission, setHasPermission] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const devices = useCameraDevices();
-  const device = devices.find(d => d.position === 'back');
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [scanned, setScanned] = useState(false);
 
   useEffect(() => {
-    checkCameraPermission();
+    getCameraPermissions();
   }, []);
 
-  const checkCameraPermission = async () => {
+  const getCameraPermissions = async () => {
     try {
-      const cameraPermission = await Camera.getCameraPermissionStatus();
-      
-      if (cameraPermission === 'not-determined') {
-        const newCameraPermission = await Camera.requestCameraPermission();
-        setHasPermission(newCameraPermission === 'granted');
-      } else {
-        setHasPermission(cameraPermission === 'granted');
-      }
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === 'granted');
     } catch (error) {
-      console.error('Error checking camera permission:', error);
+      console.error('Error requesting camera permission:', error);
       Alert.alert('Permission Error', 'Unable to access camera permissions');
+      setHasPermission(false);
     }
   };
 
-  const handleBarcodeDetected = (barcode: string) => {
-    if (barcode && isActive) {
-      onBarcodeScanned(barcode);
-    }
-  };
-
-  // Frame processor for barcode detection
-  // Note: This is a placeholder - actual barcode detection would require
-  // additional libraries like react-native-vision-camera-code-scanner
-  const frameProcessor = useFrameProcessor((frame) => {
-    'worklet';
+  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
+    if (!isActive || scanned) return;
     
-    // Placeholder for barcode detection logic
-    // In a real implementation, you would use a barcode detection library here
-    // For now, we'll simulate barcode detection after a delay
+    setScanned(true);
+    onBarcodeScanned(data);
     
-    // This is just for demonstration - remove in production
-    if (Math.random() < 0.001) { // Very low probability to simulate occasional detection
-      runOnJS(handleBarcodeDetected)('1234567890123');
-    }
-  }, [isActive]);
-
-  const onCameraInitialized = () => {
-    setIsInitialized(true);
+    // Reset scanned state after a delay to allow for new scans
+    setTimeout(() => {
+      setScanned(false);
+    }, 2000);
   };
 
-  if (!hasPermission) {
+  if (hasPermission === null) {
     return (
       <View style={styles.permissionContainer}>
-        <Text style={styles.permissionText}>
-          Camera permission is required to scan barcodes
-        </Text>
+        <Text style={styles.permissionText}>Requesting camera permission...</Text>
       </View>
     );
   }
 
-  if (!device) {
+  if (hasPermission === false) {
     return (
       <View style={styles.permissionContainer}>
         <Text style={styles.permissionText}>
-          No camera device available
+          Camera permission is required to scan barcodes. Please enable camera access in your device settings.
         </Text>
       </View>
     );
@@ -85,12 +62,10 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
 
   return (
     <View style={styles.container}>
-      <Camera
+      <BarCodeScanner
+        onBarCodeScanned={isActive ? handleBarCodeScanned : undefined}
         style={styles.camera}
-        device={device}
-        isActive={isActive && hasPermission}
-        onInitialized={onCameraInitialized}
-        frameProcessor={frameProcessor}
+        barCodeTypes={[BarCodeScanner.Constants.BarCodeType.ean13, BarCodeScanner.Constants.BarCodeType.ean8, BarCodeScanner.Constants.BarCodeType.upc_a, BarCodeScanner.Constants.BarCodeType.upc_e]}
       />
       
       {/* Scanning overlay */}
@@ -103,8 +78,14 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
         </View>
         
         <Text style={styles.instructionText}>
-          Position barcode within the frame
+          {scanned ? 'Barcode detected!' : 'Position barcode within the frame'}
         </Text>
+        
+        {scanned && (
+          <View style={styles.scannedIndicator}>
+            <Text style={styles.scannedText}>✓ Scanning...</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -184,5 +165,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
+  },
+  scannedIndicator: {
+    position: 'absolute',
+    top: 50,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(52, 199, 89, 0.9)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  scannedText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

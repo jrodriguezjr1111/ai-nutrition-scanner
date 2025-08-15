@@ -34,7 +34,12 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "react-native-vision-camera"
+      [
+        "expo-barcode-scanner",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan barcodes."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
