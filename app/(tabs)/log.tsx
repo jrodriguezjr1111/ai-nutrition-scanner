@@ -1,69 +1,20 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-
-interface LogEntry {
-  id: string;
-  productName: string;
-  brand: string;
-  calories: number;
-  healthScore: number;
-  timestamp: Date;
-  servingSize: string;
-}
+import { useLogStore } from '@/stores/logStore';
 
 export default function LogScreen() {
-  // Mock data for demonstration
-  const [logEntries] = useState<LogEntry[]>([
-    {
-      id: '1',
-      productName: 'Organic Whole Wheat Bread',
-      brand: 'Nature\'s Best',
-      calories: 80,
-      healthScore: 8.2,
-      timestamp: new Date('2024-01-15T08:30:00'),
-      servingSize: '1 slice (28g)',
-    },
-    {
-      id: '2',
-      productName: 'Greek Yogurt',
-      brand: 'Chobani',
-      calories: 100,
-      healthScore: 9.1,
-      timestamp: new Date('2024-01-15T12:15:00'),
-      servingSize: '1 cup (170g)',
-    },
-    {
-      id: '3',
-      productName: 'Chocolate Chip Cookies',
-      brand: 'Pepperidge Farm',
-      calories: 160,
-      healthScore: 4.2,
-      timestamp: new Date('2024-01-14T15:45:00'),
-      servingSize: '2 cookies (28g)',
-    },
-    {
-      id: '4',
-      productName: 'Almonds',
-      brand: 'Blue Diamond',
-      calories: 170,
-      healthScore: 9.5,
-      timestamp: new Date('2024-01-14T10:20:00'),
-      servingSize: '1 oz (28g)',
-    },
-  ]);
+  const { 
+    entries, 
+    selectedDate, 
+    setSelectedDate, 
+    getTotalCalories, 
+    getAverageHealthScore,
+    getEntriesForDate 
+  } = useLogStore();
 
-  const [selectedDate, setSelectedDate] = useState('today');
-
-  const getTotalCalories = () => {
-    return logEntries.reduce((total, entry) => total + entry.calories, 0);
-  };
-
-  const getAverageHealthScore = () => {
-    const total = logEntries.reduce((sum, entry) => sum + entry.healthScore, 0);
-    return (total / logEntries.length).toFixed(1);
-  };
+  const displayEntries = getEntriesForDate(selectedDate);
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', { 
@@ -119,12 +70,12 @@ export default function LogScreen() {
           </ThemedView>
           
           <ThemedView style={styles.summaryItem}>
-            <ThemedText style={styles.summaryValue}>{logEntries.length}</ThemedText>
+            <ThemedText style={styles.summaryValue}>{displayEntries.length}</ThemedText>
             <ThemedText style={styles.summaryLabel}>Items Scanned</ThemedText>
           </ThemedView>
           
           <ThemedView style={styles.summaryItem}>
-            <ThemedText style={[styles.summaryValue, { color: getHealthScoreColor(Number(getAverageHealthScore())) }]}>
+            <ThemedText style={[styles.summaryValue, { color: getHealthScoreColor(getAverageHealthScore()) }]}>
               {getAverageHealthScore()}
             </ThemedText>
             <ThemedText style={styles.summaryLabel}>Avg Health Score</ThemedText>
@@ -166,12 +117,12 @@ export default function LogScreen() {
           Scan History
         </ThemedText>
         
-        {logEntries.map((entry) => (
+        {displayEntries.map((entry) => (
           <ThemedView key={entry.id} style={styles.logEntry}>
             <ThemedView style={styles.logHeader}>
               <ThemedView style={styles.logInfo}>
-                <ThemedText style={styles.productName}>{entry.productName}</ThemedText>
-                <ThemedText style={styles.brand}>{entry.brand}</ThemedText>
+                <ThemedText style={styles.productName}>{entry.product.name}</ThemedText>
+                <ThemedText style={styles.brand}>{entry.product.brand}</ThemedText>
                 <ThemedText style={styles.servingSize}>{entry.servingSize}</ThemedText>
               </ThemedView>
               
@@ -199,7 +150,7 @@ export default function LogScreen() {
         ))}
       </ThemedView>
 
-      {logEntries.length === 0 && (
+      {displayEntries.length === 0 && (
         <ThemedView style={styles.emptyState}>
           <ThemedText style={styles.emptyText}>No scans yet today</ThemedText>
           <ThemedText style={styles.emptySubtext}>

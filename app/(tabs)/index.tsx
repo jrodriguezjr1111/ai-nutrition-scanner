@@ -1,20 +1,87 @@
 import React, { useState } from 'react';
-import { StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { BarcodeScanner } from '@/components/BarcodeScanner';
+import { useScanStore } from '@/stores/scanStore';
+import { nutritionApi } from '@/services/nutritionApi';
 
 export default function HomeScreen() {
-  const [isScanning, setIsScanning] = useState(false);
+  const router = useRouter();
+  const { isScanning, startScanning, stopScanning, setCurrentProduct, setError } = useScanStore();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleScanPress = () => {
-    setIsScanning(true);
-    // TODO: Implement camera scanning functionality
-    Alert.alert(
-      'Scanner Ready',
-      'Camera functionality will be implemented here. This will scan barcodes and analyze nutrition information.',
-      [{ text: 'OK', onPress: () => setIsScanning(false) }]
-    );
+    startScanning();
   };
+
+  const handleStopScan = () => {
+    stopScanning();
+  };
+
+  const handleBarcodeScanned = async (barcode: string) => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    stopScanning();
+
+    try {
+      const product = await nutritionApi.getProductByBarcode(barcode);
+      
+      if (product) {
+        setCurrentProduct(product);
+        router.push('/scan-result');
+      } else {
+        Alert.alert(
+          'Product Not Found',
+          'We couldn\'t find nutrition information for this product. Please try another barcode.',
+          [{ text: 'OK', onPress: () => startScanning() }]
+        );
+      }
+    } catch (error) {
+      setError('Failed to fetch product information. Please check your internet connection and try again.');
+      Alert.alert(
+        'Error',
+        'Failed to fetch product information. Please try again.',
+        [{ text: 'OK', onPress: () => startScanning() }]
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isScanning) {
+    return (
+      <ThemedView style={styles.container}>
+        <BarcodeScanner
+          onBarcodeScanned={handleBarcodeScanned}
+          isActive={isScanning && !isLoading}
+        />
+        
+        {isLoading && (
+          <ThemedView style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <ThemedText style={styles.loadingText}>
+              Analyzing product...
+            </ThemedText>
+          </ThemedView>
+        )}
+        
+        <ThemedView style={styles.scanControls}>
+          <TouchableOpacity
+            style={styles.stopButton}
+            onPress={handleStopScan}
+            disabled={isLoading}
+          >
+            <ThemedText style={styles.stopButtonText}>
+              Stop Scanning
+            </ThemedText>
+          </TouchableOpacity>
+        </ThemedView>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -30,19 +97,18 @@ export default function HomeScreen() {
       <ThemedView style={styles.scanArea}>
         <ThemedView style={styles.scanFrame}>
           <ThemedText style={styles.scanText}>
-            {isScanning ? 'Scanning...' : 'Position barcode in frame'}
+            Ready to scan
           </ThemedText>
         </ThemedView>
       </ThemedView>
 
       <ThemedView style={styles.controls}>
         <TouchableOpacity
-          style={[styles.scanButton, isScanning && styles.scanButtonActive]}
+          style={styles.scanButton}
           onPress={handleScanPress}
-          disabled={isScanning}
         >
           <ThemedText style={styles.scanButtonText}>
-            {isScanning ? 'Scanning...' : 'Start Scan'}
+            Start Scanning
           </ThemedText>
         </TouchableOpacity>
 
@@ -115,5 +181,39 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     paddingHorizontal: 20,
     lineHeight: 20,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 16,
+    marginTop: 15,
+  },
+  scanControls: {
+    position: 'absolute',
+    bottom: 50,
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+  },
+  stopButton: {
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 20,
+  },
+  stopButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

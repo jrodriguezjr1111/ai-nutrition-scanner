@@ -1,42 +1,61 @@
 import React from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { useScanStore } from '@/stores/scanStore';
+import { useLogStore } from '@/stores/logStore';
 
 export default function ScanResultScreen() {
-  // Mock data for demonstration
-  const mockProduct = {
-    name: 'Organic Whole Wheat Bread',
-    brand: 'Nature\'s Best',
-    barcode: '1234567890123',
-    servingSize: '1 slice (28g)',
-    calories: 80,
-    nutrients: {
-      totalFat: { value: 1.5, unit: 'g', dailyValue: 2 },
-      saturatedFat: { value: 0.3, unit: 'g', dailyValue: 2 },
-      sodium: { value: 150, unit: 'mg', dailyValue: 7 },
-      totalCarbs: { value: 15, unit: 'g', dailyValue: 5 },
-      fiber: { value: 3, unit: 'g', dailyValue: 11 },
-      sugars: { value: 2, unit: 'g', dailyValue: null },
-      protein: { value: 4, unit: 'g', dailyValue: 8 },
-    },
-    aiInsights: [
-      'High in fiber - good for digestive health',
-      'Low in saturated fat',
-      'Moderate sodium content - consider for daily intake',
-      'Good source of protein for a bread product',
-    ],
-    healthScore: 8.2,
-  };
+  const router = useRouter();
+  const { currentProduct, clearScan } = useScanStore();
+  const { addEntry } = useLogStore();
+
+  // If no product is scanned, show empty state
+  if (!currentProduct) {
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedView style={styles.emptyState}>
+          <ThemedText style={styles.emptyText}>No scan results</ThemedText>
+          <ThemedText style={styles.emptySubtext}>
+            Go to the Scanner tab to scan a product
+          </ThemedText>
+          <TouchableOpacity
+            style={styles.scanButton}
+            onPress={() => router.push('/')}
+          >
+            <ThemedText style={styles.scanButtonText}>Start Scanning</ThemedText>
+          </TouchableOpacity>
+        </ThemedView>
+      </ThemedView>
+    );
+  }
 
   const handleSaveToLog = () => {
-    // TODO: Implement save to log functionality
-    console.log('Saving to log...');
+    try {
+      addEntry(currentProduct);
+      Alert.alert(
+        'Saved!',
+        'Product has been added to your daily log.',
+        [
+          {
+            text: 'View Log',
+            onPress: () => router.push('/log'),
+          },
+          {
+            text: 'OK',
+            style: 'default',
+          },
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save product to log. Please try again.');
+    }
   };
 
   const handleScanAnother = () => {
-    // TODO: Navigate back to scanner
-    console.log('Scanning another product...');
+    clearScan();
+    router.push('/');
   };
 
   return (
@@ -49,32 +68,32 @@ export default function ScanResultScreen() {
 
       <ThemedView style={styles.productCard}>
         <ThemedText type="subtitle" style={styles.productName}>
-          {mockProduct.name}
+          {currentProduct.name}
         </ThemedText>
-        <ThemedText style={styles.brand}>{mockProduct.brand}</ThemedText>
-        <ThemedText style={styles.barcode}>Barcode: {mockProduct.barcode}</ThemedText>
+        <ThemedText style={styles.brand}>{currentProduct.brand}</ThemedText>
+        <ThemedText style={styles.barcode}>Barcode: {currentProduct.barcode}</ThemedText>
       </ThemedView>
 
       <ThemedView style={styles.nutritionCard}>
         <ThemedText type="subtitle" style={styles.sectionTitle}>
           Nutrition Facts
         </ThemedText>
-        <ThemedText style={styles.servingSize}>Per {mockProduct.servingSize}</ThemedText>
+        <ThemedText style={styles.servingSize}>Per {currentProduct.servingSize}</ThemedText>
         
         <ThemedView style={styles.caloriesRow}>
           <ThemedText style={styles.caloriesLabel}>Calories</ThemedText>
-          <ThemedText style={styles.caloriesValue}>{mockProduct.calories}</ThemedText>
+          <ThemedText style={styles.caloriesValue}>{currentProduct.calories}</ThemedText>
         </ThemedView>
 
         <ThemedView style={styles.nutrientsContainer}>
-          {Object.entries(mockProduct.nutrients).map(([key, nutrient]) => (
+          {Object.entries(currentProduct.nutrients).map(([key, nutrient]) => (
             <ThemedView key={key} style={styles.nutrientRow}>
               <ThemedText style={styles.nutrientName}>
                 {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
               </ThemedText>
               <ThemedText style={styles.nutrientValue}>
-                {nutrient.value}{nutrient.unit}
-                {nutrient.dailyValue && ` (${nutrient.dailyValue}% DV)`}
+                {(nutrient as any).value}{(nutrient as any).unit}
+                {(nutrient as any).dailyValue && ` (${(nutrient as any).dailyValue}% DV)`}
               </ThemedText>
             </ThemedView>
           ))}
@@ -87,10 +106,10 @@ export default function ScanResultScreen() {
         </ThemedText>
         <ThemedView style={styles.healthScoreContainer}>
           <ThemedText style={styles.healthScoreLabel}>Health Score</ThemedText>
-          <ThemedText style={styles.healthScore}>{mockProduct.healthScore}/10</ThemedText>
+          <ThemedText style={styles.healthScore}>{currentProduct.healthScore}/10</ThemedText>
         </ThemedView>
         
-        {mockProduct.aiInsights.map((insight, index) => (
+        {currentProduct.aiInsights.map((insight: string, index: number) => (
           <ThemedView key={index} style={styles.insightRow}>
             <ThemedText style={styles.insightBullet}>•</ThemedText>
             <ThemedText style={styles.insightText}>{insight}</ThemedText>
@@ -247,5 +266,23 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 10,
+    opacity: 0.7,
+  },
+  emptySubtext: {
+    textAlign: 'center',
+    opacity: 0.5,
+    marginBottom: 30,
+    lineHeight: 20,
   },
 });
